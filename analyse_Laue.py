@@ -2,12 +2,11 @@ import os
 import glob
 import cv2
 import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-import scipy.signal as sc
+import pandas as pd
 from scipy.optimize import curve_fit
+import openpyxl
+from openpyxl.utils.dataframe import dataframe_to_rows
 
-palette = sns.color_palette("colorblind")
 
 def process_image(image_bg, thresh_factor):
     """
@@ -185,7 +184,7 @@ def find_contour_centroids(contours, image):
 
     return centroids, centroids_uncertainty
 
-def draw_point(image, name, centroids):
+def draw_points(image, name, centroids, laue_dict, center):
     """
     Draws points at the centroids in the image and saves it as an image 
     file with the specified name.
@@ -195,30 +194,25 @@ def draw_point(image, name, centroids):
     name (str): The base name of the output image file.
     centroids (list): The list of centroids to draw.
     """
-    # Create a copy of the image to draw on
-    rescaled_spectrum = cv2.normalize(np.log(image), None, 0, 255, 
-                                    cv2.NORM_MINMAX)
-    colored_spectrum = cv2.cvtColor(rescaled_spectrum.astype(np.uint8), 
+    image = np.clip((image/65535.0) * 255.0, 0, 255).astype(np.uint8)
+    colored_spectrum = cv2.cvtColor(image.astype(np.uint8), 
                                     cv2.COLOR_GRAY2BGR)
 
-    # Iterate over the centroids and draw dots and numerotation for each one
+    h = laue_dict['h']
+    k = laue_dict['k']
+    l = laue_dict['l']
+
+    centroids.remove(center)
+
     for i, centroid in enumerate(centroids):
-        # Convert the centroid coordinates to integers
         x, y = map(int, centroid)
 
-        # Draw a dot at the centroid
-        cv2.circle(colored_spectrum, (x, y), 5, (255, 255, 255), -1)
+        cv2.circle(colored_spectrum, (x, y), 10, (255, 255, 255), -1)
 
-        # Define the font and size for the numerotation
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.5
-        font_thickness = 1
-
-        # Draw the numerotation on the image
-        cv2.putText(colored_spectrum, str(i+1), (x, y), font, font_scale,
-                    (0, 0, 0), font_thickness, cv2.LINE_AA)
+        cv2.putText(colored_spectrum, str((h[i],k[i],l[i])), (x-15, y+30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
     
-    out_dir = os.path.join("output", "08_miller")
+    out_dir = os.path.join("output", "05_hkl")
     os.makedirs(out_dir, exist_ok=True)
     cv2.imwrite(os.path.join(out_dir, name + ".png"), colored_spectrum)
 
@@ -261,7 +255,7 @@ def find_pairs(image, centroids):
                 centroids2match.remove(c_prime)
                 break
 
-    return pos_pairs
+    return pos_pairs, center
 
 def draw_pairs(image, name, pairs):
     """
@@ -288,29 +282,107 @@ def draw_pairs(image, name, pairs):
     os.makedirs(out_dir, exist_ok=True)
     cv2.imwrite(os.path.join(out_dir, name + ".png"), colored_spectrum)
 
-def print_d_spacings(d_spacings, d_spacings_uncert, d_spacings_res,
-                    d_spacings_res_uncert, name):
-    """
-    Print d-spacings and uncertainties.
+def laue(name, centroids, uncerts, center):
+    laue_data = {
+        'xQ': [],
+        'xQ_err' : [],
+        'yQ': [],
+        'yQ_err' : [],
+        'zQ': [],
+        'zQ_err' : [],
+        'vec_u': [],
+        'vec_v': [],
+        'h': [],
+        'k': [],
+        'l': [],
+        'n' : [],
+        'd_hkl': [],
+        'wavelength': []
+    }
 
-    Args:
-        d_spacings (list): List of mean d-spacings.
-        d_spacings_uncert (list): List of uncertainties in mean d-spacings (in pixels).
-        d_spacings_res (list): List of mean d-spacings in picometers.
-        d_spacings_res_uncert (list): List of uncertainties in mean d-spacings (in picometers).
-        name (str): Name of the sample or dataset.
-    """
-    print("\n\tTable of D-Spacing of {}".format(name))
-    print("Index |  D-Spacing (pixels)  |  D-Spacing (picometers)")
-    print("------------------------------------------------------")
-    for i, (d, uncert, d_res, res_uncert) in enumerate(zip(d_spacings, 
-            d_spacings_uncert, d_spacings_res, d_spacings_res_uncert), 1):
-        spacing_str = f"{d:.3f}"
-        incertitude_str = f"{uncert:.3f}"
-        spacing_res_str = f"{d_res:.3f}"
-        incertitude_res_str = f"{res_uncert:.3f}"
-        index_str = str(i).rjust(5, "0")
-        print(f"{index_str} |     {spacing_str} ± {incertitude_str}    |     {spacing_res_str} ± {incertitude_res_str}")
+    if name == "LiF":
+        a0 = 403E-12
+    elif name == "NaCl":
+        a0 = 564E-12
+    elif name == "Si":
+        a0 = 543E-12
+
+    resolution = 49.5E-6
+    L = 2E-2
+    center_index = centroids.index(center)
+
+    for i, centroid in enumerate(centroids):
+        if i ==  center_index:
+            continue
+        x, y = map(int, centroid)
+        xQ = (x - center[1]) * resolution
+        #xQ = abs(x - center[1]) * resolution
+        xQ_uncert = (uncerts[i][0] + uncerts[center_index][0]) * resolution
+        yQ = (y - center[0]) * resolution
+        #yQ = abs(y - center[0]) * resolution
+        yQ_uncert = (uncerts[i][1] + uncerts[center_index][1]) * resolution
+        #zQ = np.sqrt(xQ**2 + yQ**2 + L**2) - L
+        zQ = np.sqrt(xQ**2 + yQ**2)
+        zQ_uncert =  np.sqrt(((2*xQ/(2*np.sqrt(xQ**2+yQ_uncert**2)))*xQ_uncert)**2 +
+                            ((2*yQ/(2*np.sqrt(xQ**2+yQ_uncert**2)))*yQ_uncert)**2)
+
+        vec_u = 1 / (np.tan(0.5 * np.arctan(zQ / L))) * (xQ / zQ)
+        vec_v = 1 / (np.tan(0.5 * np.arctan(zQ / L))) * (yQ / zQ)
+
+        vec_u_rounded = round(vec_u * 2) / 2
+        vec_v_rounded = round(vec_v * 2) / 2
+
+        if  vec_u_rounded.is_integer():
+            l = 1
+        else:
+            l = 2
+        h = int(vec_u_rounded * l)
+
+        if vec_v_rounded.is_integer():
+            m = 1
+        else:
+            m = 2
+        k = int(vec_v_rounded * m)
+
+        n = h**2 + k**2 + l**2
+        d_hkl = a0 / np.sqrt(n)
+
+        wavelength = 2 * d_hkl * np.sin(np.arctan(l / np.sqrt(h**2 + k**2)))
+
+        laue_data['xQ'].append(xQ)
+        laue_data['xQ_err'].append(xQ_uncert)
+        laue_data['yQ'].append(yQ)
+        laue_data['yQ_err'].append(yQ_uncert)
+        laue_data['zQ'].append(zQ)
+        laue_data['zQ_err'].append(zQ_uncert)
+        laue_data['vec_u'].append(vec_u)
+        laue_data['vec_v'].append(vec_v)
+        laue_data['h'].append(h)
+        laue_data['k'].append(k)
+        laue_data['l'].append(l)
+        laue_data['n'].append(n)
+        laue_data['d_hkl'].append(d_hkl)
+        laue_data['wavelength'].append(wavelength)
+    return laue_data
+
+def lau_to_excel(name, laue_data):
+    try:
+        wb = openpyxl.load_workbook("laue_data.xlsx")
+    except FileNotFoundError:
+        wb = openpyxl.Workbook()
+
+    # Check if sheet with the given name already exists
+    if name in wb.sheetnames:
+        ws = wb[name]
+    else:
+        ws = wb.create_sheet(title=name)
+
+    df = pd.DataFrame(laue_data)
+    for r_idx, row in enumerate(dataframe_to_rows(df, index=False, header=True), 1):
+        for c_idx, value in enumerate(row, 1):
+            ws.cell(row=r_idx, column=c_idx, value=value)
+
+    wb.save("laue_data.xlsx")
 
 if __name__ == "__main__":
     images_path = glob.glob(os.path.join("data", "recontrasted", "*png"))
@@ -323,9 +395,9 @@ if __name__ == "__main__":
     lif_img, nacl_img, si_img = images_dic.values()
     lif_bg_img, nacl_bg_img, si_bg_img = images_bg_dic.values()
 
-    draw_all_contours(lif_img, lif_bg_img, lif_name, factor=0.31)
-    draw_all_contours(nacl_img, nacl_bg_img, nacl_name, factor=0.05)
-    draw_all_contours(si_img, si_bg_img, si_name, factor=0.07)
+    #draw_all_contours(lif_img, lif_bg_img, lif_name, factor=0.31)
+    #draw_all_contours(nacl_img, nacl_bg_img, nacl_name, factor=0.05)
+    #draw_all_contours(si_img, si_bg_img, si_name, factor=0.07)
 
     contour2remove_lif = [2, 7, 10, 13, 14, 18, 19, 22, 23, 25, 27, 32]
     contour2remove_nacl = [17]
@@ -333,24 +405,28 @@ if __name__ == "__main__":
     contours_lif = remove_contours(lif_bg_img, contour2remove_lif, factor=0.31)
     contours_nacl = remove_contours(nacl_bg_img, contour2remove_nacl, factor=0.05)
     contours_si = remove_contours(si_bg_img, contour2remove_si, factor=0.07)
-    draw_good_contours(lif_img, lif_name, contours_lif)
-    draw_good_contours(nacl_img, nacl_name, contours_nacl)
-    draw_good_contours(si_img, si_name, contours_si)
+    #draw_good_contours(lif_img, lif_name, contours_lif)
+    #draw_good_contours(nacl_img, nacl_name, contours_nacl)
+    #draw_good_contours(si_img, si_name, contours_si)
 
     centroids_lif, uncert_lif = find_contour_centroids(contours_lif, lif_img)
     centroids_nacl, uncert_nacl = find_contour_centroids(contours_nacl, nacl_img)
     centroids_si, uncert_si = find_contour_centroids(contours_si, si_img)
 
-    pos_pairs_lif = find_pairs(lif_img, centroids_lif)
-    pos_pairs_nacl = find_pairs(nacl_img, centroids_nacl)
-    pos_pairs_si = find_pairs(si_img, centroids_si)
-    draw_pairs(lif_img, lif_name, pos_pairs_lif)
-    draw_pairs(nacl_img, nacl_name, pos_pairs_nacl)
-    draw_pairs(si_img, si_name, pos_pairs_si)
+    pos_pairs_lif, center_lif = find_pairs(lif_img, centroids_lif)
+    pos_pairs_nacl, center_nacl = find_pairs(nacl_img, centroids_nacl)
+    pos_pairs_si, center_si = find_pairs(si_img, centroids_si)
+    #draw_pairs(lif_img, lif_name, pos_pairs_lif)
+    #draw_pairs(nacl_img, nacl_name, pos_pairs_nacl)
+    #draw_pairs(si_img, si_name, pos_pairs_si)
 
-    """pix_5, pm_5 = calculate_d_spacings(signals_5)
-    pix_6, pm_6 = calculate_d_spacings(signals_6)
-    pix_7, pm_7 = calculate_d_spacings(signals_7)
-    print_d_spacings(pix_5[0], pix_5[1], pm_5[0], pm_5[1], image_5_name)
-    print_d_spacings(pix_6[0], pix_6[1], pm_6[0], pm_6[1], image_6_name)
-    print_d_spacings(pix_7[0], pix_7[1], pm_7[0], pm_7[1], image_7_name)"""
+    laue_dict_lif = laue(lif_name, centroids_lif, uncert_lif, center_lif)
+    laue_dict_nacl = laue(nacl_name, centroids_nacl, uncert_nacl, center_nacl)
+    laue_dict_si = laue(si_name, centroids_si, uncert_si, center_si)
+    #lau_to_excel(lif_name, laue_dict_lif)
+    #lau_to_excel(nacl_name, laue_dict_nacl)
+    #lau_to_excel(si_name, laue_dict_si)
+
+    draw_points(lif_img, lif_name, centroids_lif, laue_dict_lif, center_lif)
+    draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
+    draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
