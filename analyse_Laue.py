@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
+import matplotlib.pyplot as plt
 import openpyxl
 from openpyxl.utils.dataframe import dataframe_to_rows
 
@@ -295,8 +296,9 @@ def laue(name, centroids, uncerts, center):
         'h': [],
         'k': [],
         'l': [],
-        'n' : [],
+        'n': [],
         'd_hkl': [],
+        'theta': [],
         'wavelength': []
     }
 
@@ -316,18 +318,16 @@ def laue(name, centroids, uncerts, center):
             continue
         x, y = map(int, centroid)
         xQ = (x - center[1]) * resolution
-        #xQ = abs(x - center[1]) * resolution
         xQ_uncert = (uncerts[i][0] + uncerts[center_index][0]) * resolution
         yQ = (y - center[0]) * resolution
-        #yQ = abs(y - center[0]) * resolution
         yQ_uncert = (uncerts[i][1] + uncerts[center_index][1]) * resolution
         #zQ = np.sqrt(xQ**2 + yQ**2 + L**2) - L
         zQ = np.sqrt(xQ**2 + yQ**2)
         zQ_uncert =  np.sqrt(((2*xQ/(2*np.sqrt(xQ**2+yQ_uncert**2)))*xQ_uncert)**2 +
                             ((2*yQ/(2*np.sqrt(xQ**2+yQ_uncert**2)))*yQ_uncert)**2)
 
-        vec_u = 1 / (np.tan(0.5 * np.arctan(zQ / L))) * (xQ / zQ)
-        vec_v = 1 / (np.tan(0.5 * np.arctan(zQ / L))) * (yQ / zQ)
+        vec_u = -1 / (0.5 * np.tan(np.arctan(zQ / L))) * (xQ / zQ)
+        vec_v = -1 / (0.5 * np.tan(np.arctan(zQ / L))) * (yQ / zQ)
 
         vec_u_rounded = round(vec_u * 2) / 2
         vec_v_rounded = round(vec_v * 2) / 2
@@ -347,7 +347,8 @@ def laue(name, centroids, uncerts, center):
         n = h**2 + k**2 + l**2
         d_hkl = a0 / np.sqrt(n)
 
-        wavelength = 2 * d_hkl * np.sin(np.arctan(l / np.sqrt(h**2 + k**2)))
+        theta = np.arctan(zQ / np.sqrt(xQ**2 + yQ**2))
+        wavelength = 2 * d_hkl * np.sin(theta)
 
         laue_data['xQ'].append(xQ)
         laue_data['xQ_err'].append(xQ_uncert)
@@ -362,7 +363,9 @@ def laue(name, centroids, uncerts, center):
         laue_data['l'].append(l)
         laue_data['n'].append(n)
         laue_data['d_hkl'].append(d_hkl)
+        laue_data['theta'].append(theta)
         laue_data['wavelength'].append(wavelength)
+
     return laue_data
 
 def lau_to_excel(name, laue_data):
@@ -383,6 +386,16 @@ def lau_to_excel(name, laue_data):
             ws.cell(row=r_idx, column=c_idx, value=value)
 
     wb.save("laue_data.xlsx")
+
+def plot_a0(laue_data, name):
+    n = laue_data['n']
+    theta = laue_data['theta']
+    y_axis = np.multiply(n, theta)
+    print(theta)
+    x_axis = np.sin(theta)
+    print(x_axis)
+    plt.scatter(x_axis, y_axis)
+    plt.show()
 
 if __name__ == "__main__":
     images_path = glob.glob(os.path.join("data", "recontrasted", "*png"))
@@ -427,6 +440,8 @@ if __name__ == "__main__":
     #lau_to_excel(nacl_name, laue_dict_nacl)
     #lau_to_excel(si_name, laue_dict_si)
 
-    draw_points(lif_img, lif_name, centroids_lif, laue_dict_lif, center_lif)
-    draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
-    draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
+    #draw_points(lif_img, lif_name, centroids_lif, laue_dict_lif, center_lif)
+    #draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
+    #draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
+
+    plot_a0(laue_dict_lif, lif_name)
