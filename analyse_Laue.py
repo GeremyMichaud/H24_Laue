@@ -391,9 +391,7 @@ def plot_a0(laue_data, name):
     n = laue_data['n']
     theta = laue_data['theta']
     y_axis = np.multiply(n, theta)
-    print(theta)
     x_axis = np.sin(theta)
-    print(x_axis)
     plt.scatter(x_axis, y_axis)
     plt.show()
 
@@ -444,4 +442,4 @@ if __name__ == "__main__":
     #draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
     #draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
 
-    plot_a0(laue_dict_lif, lif_name)
+    #plot_a0(laue_dict_lif, lif_name)
