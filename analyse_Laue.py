@@ -449,8 +449,8 @@ def gnomonique(laue_data, name):
     u = np.array(h) / np.array(l)
 
     plt.scatter(v, u, color=palette[0], s=15)
-    plt.xlabel(r'$u = h/l$', fontsize=16)
-    plt.ylabel(r'$v = k/l$', fontsize=16)
+    plt.xlabel(r'$u = h/l$   [-]', fontsize=16)
+    plt.ylabel(r'$v = k/l$   [-]', fontsize=16)
     plt.minorticks_on()
     plt.tick_params(axis="both", which="both", direction="in", top=True, right=True, labelsize=14)
 
