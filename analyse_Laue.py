@@ -546,8 +546,8 @@ if __name__ == "__main__":
     #draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
     #draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
 
-    gnomonique(laue_dict_lif, lif_name)
-    gnomonique(laue_dict_nacl, nacl_name)
-    gnomonique(laue_dict_si, si_name)
+    #gnomonique(laue_dict_lif, lif_name)
+    #gnomonique(laue_dict_nacl, nacl_name)
+    #gnomonique(laue_dict_si, si_name)
 
     #plot_a0(laue_dict_lif, laue_dict_nacl, laue_dict_si)
