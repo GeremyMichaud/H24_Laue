@@ -4,10 +4,14 @@ import cv2
 import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
+from scipy.stats import linregress
 import matplotlib.pyplot as plt
 import openpyxl
 from openpyxl.utils.dataframe import dataframe_to_rows
+import seaborn as sns
 
+
+palette = sns.color_palette("bright")
 
 def process_image(image_bg, thresh_factor):
     """
@@ -284,15 +288,49 @@ def draw_pairs(image, name, pairs):
     cv2.imwrite(os.path.join(out_dir, name + ".png"), colored_spectrum)
 
 def laue(name, centroids, uncerts, center):
+    """
+    Calculates various parameters related to crystallography based on input data.
+
+    Args:
+        name (str): The name of the crystal. Should be one of "LiF", "NaCl", or "Si".
+        centroids (list): A list of centroid coordinates (x, y) for each point.
+        uncerts (list): A list of uncertainty values for each centroid.
+        center (tuple): The centroid coordinates (x, y) of the center point.
+
+    Returns:
+        dict: A dictionary containing the calculated parameters including:
+            - 'xQ': List of x-coordinates after centering.
+            - 'xQ_err': List of uncertainties in x-coordinates.
+            - 'yQ': List of y-coordinates after centering.
+            - 'yQ_err': List of uncertainties in y-coordinates.
+            - 'zQ': List of z-coordinates.
+            - 'zQ_err': List of uncertainties in z-coordinates.
+            - 'fct': List of factors.
+            - 'h': List of h-values.
+            - 'k': List of k-values.
+            - 'l': List of l-values.
+            - 'n': List of n-values.
+            - 'd_hkl': List of d_hkl values.
+            - 'theta': List of theta values.
+            - 'wavelength': List of wavelengths.
+    """
+    # Define crystal lattice constants
+    crystal_constants = {"LiF": 403E-12, "NaCl": 564E-12, "Si": 543E-12}
+    a0 = crystal_constants.get(name, 0)  # Get lattice constant based on 'name'
+
+    # Constants for calculations
+    resolution = 49.5E-6
+    L = 2E-2
+
+    # Initialize laue_data dictionary
     laue_data = {
         'xQ': [],
-        'xQ_err' : [],
+        'xQ_err': [],
         'yQ': [],
-        'yQ_err' : [],
+        'yQ_err': [],
         'zQ': [],
-        'zQ_err' : [],
-        'vec_u': [],
-        'vec_v': [],
+        'zQ_err': [],
+        'fct': [],
         'h': [],
         'k': [],
         'l': [],
@@ -302,66 +340,68 @@ def laue(name, centroids, uncerts, center):
         'wavelength': []
     }
 
-    if name == "LiF":
-        a0 = 403E-12
-    elif name == "NaCl":
-        a0 = 564E-12
-    elif name == "Si":
-        a0 = 543E-12
-
-    resolution = 49.5E-6
-    L = 2E-2
+    # Calculate center index
     center_index = centroids.index(center)
 
+    # Populate 'xQ', 'xQ_err', 'yQ', 'yQ_err' lists
     for i, centroid in enumerate(centroids):
-        if i ==  center_index:
+        if i == center_index:
             continue
         x, y = map(int, centroid)
         xQ = (x - center[1]) * resolution
         xQ_uncert = (uncerts[i][0] + uncerts[center_index][0]) * resolution
         yQ = (y - center[0]) * resolution
         yQ_uncert = (uncerts[i][1] + uncerts[center_index][1]) * resolution
-        #zQ = np.sqrt(xQ**2 + yQ**2 + L**2) - L
-        zQ = np.sqrt(xQ**2 + yQ**2)
-        zQ_uncert =  np.sqrt(((2*xQ/(2*np.sqrt(xQ**2+yQ_uncert**2)))*xQ_uncert)**2 +
-                            ((2*yQ/(2*np.sqrt(xQ**2+yQ_uncert**2)))*yQ_uncert)**2)
-
-        vec_u = -1 / (0.5 * np.tan(np.arctan(zQ / L))) * (xQ / zQ)
-        vec_v = -1 / (0.5 * np.tan(np.arctan(zQ / L))) * (yQ / zQ)
-
-        vec_u_rounded = round(vec_u * 2) / 2
-        vec_v_rounded = round(vec_v * 2) / 2
-
-        if  vec_u_rounded.is_integer():
-            l = 1
-        else:
-            l = 2
-        h = int(vec_u_rounded * l)
-
-        if vec_v_rounded.is_integer():
-            m = 1
-        else:
-            m = 2
-        k = int(vec_v_rounded * m)
-
-        n = h**2 + k**2 + l**2
-        d_hkl = a0 / np.sqrt(n)
-
-        theta = np.arctan(zQ / np.sqrt(xQ**2 + yQ**2))
-        wavelength = 2 * d_hkl * np.sin(theta)
 
         laue_data['xQ'].append(xQ)
         laue_data['xQ_err'].append(xQ_uncert)
         laue_data['yQ'].append(yQ)
         laue_data['yQ_err'].append(yQ_uncert)
+
+    # Centering data
+    corrx_fct = np.mean(laue_data['xQ'])
+    corry_fct = np.mean(laue_data['yQ'])
+    laue_data['xQ'] = [xQ - corrx_fct for xQ in laue_data['xQ']]
+    laue_data['yQ'] = [yQ - corry_fct for yQ in laue_data['yQ']]
+
+    # Calculate 'zQ' and other parameters
+    for i in range(len(laue_data['xQ'])):
+        xQ = laue_data['xQ'][i]
+        xQ_uncert = laue_data['xQ_err'][i]
+        yQ = laue_data['yQ'][i]
+        yQ_uncert = laue_data['yQ_err'][i]
+        zQ = np.sqrt(xQ ** 2 + yQ ** 2 + L ** 2) - L
+        zQ_uncert = np.sqrt(
+            ((2 * xQ / (2 * np.sqrt(xQ ** 2 + yQ_uncert ** 2))) * xQ_uncert) ** 2 +
+            ((2 * yQ / (2 * np.sqrt(xQ ** 2 + yQ_uncert ** 2))) * yQ_uncert) ** 2
+        )
+
+        l = 1
+        factor = l / zQ
+        h = round(xQ * factor)
+        k = round(yQ * factor)
+
+        # Adjust l if parity conditions are not met
+        if (h + k) % 2 == 1 or (h + l) % 2 == 1:
+            l = 2
+            factor = l / zQ
+            h = round(xQ * factor)
+            k = round(yQ * factor)
+
+        n = np.sqrt(h ** 2 + k ** 2 + l ** 2)
+        d_hkl = a0 / n
+
+        theta = np.arctan(zQ / np.sqrt(xQ ** 2 + yQ ** 2))
+        #wavelength = 2 * d_hkl * np.sin(theta) / n
+        wavelength = 2 * d_hkl * np.sin(theta)
+
         laue_data['zQ'].append(zQ)
         laue_data['zQ_err'].append(zQ_uncert)
-        laue_data['vec_u'].append(vec_u)
-        laue_data['vec_v'].append(vec_v)
+        laue_data['fct'].append(factor)
         laue_data['h'].append(h)
         laue_data['k'].append(k)
         laue_data['l'].append(l)
-        laue_data['n'].append(n)
+        laue_data['n'].append(round(n))
         laue_data['d_hkl'].append(d_hkl)
         laue_data['theta'].append(theta)
         laue_data['wavelength'].append(wavelength)
@@ -369,31 +409,95 @@ def laue(name, centroids, uncerts, center):
     return laue_data
 
 def lau_to_excel(name, laue_data):
+    """
+    Writes the provided data to an Excel file named 'laue_data.xlsx' under the specified sheet name.
+
+    Args:
+        name (str): The name of the sheet to write the data to.
+        laue_data (dict): A dictionary containing the data to be written to the Excel file. The keys represent
+                        column names, and the values are lists of data corresponding to each column."""
+    # Load existing workbook or create a new one
     try:
         wb = openpyxl.load_workbook("laue_data.xlsx")
     except FileNotFoundError:
         wb = openpyxl.Workbook()
 
     # Check if sheet with the given name already exists
-    if name in wb.sheetnames:
+    if "Sheet" in wb.sheetnames:
+        ws = wb["Sheet"]
+        ws.title = name
+    elif name in wb.sheetnames:
         ws = wb[name]
     else:
         ws = wb.create_sheet(title=name)
 
-    df = pd.DataFrame(laue_data)
-    for r_idx, row in enumerate(dataframe_to_rows(df, index=False, header=True), 1):
-        for c_idx, value in enumerate(row, 1):
-            ws.cell(row=r_idx, column=c_idx, value=value)
+    # Convert laue_data to DataFrame and write to worksheet
+    if laue_data:
+        df = pd.DataFrame(laue_data)
+        for r_idx, row in enumerate(dataframe_to_rows(df, index=False, header=True), 1):
+            for c_idx, value in enumerate(row, 1):
+                ws.cell(row=r_idx, column=c_idx, value=value)
 
     wb.save("laue_data.xlsx")
 
-def plot_a0(laue_data, name):
-    n = laue_data['n']
-    theta = laue_data['theta']
-    y_axis = np.multiply(n, theta)
-    x_axis = np.sin(theta)
-    plt.scatter(x_axis, y_axis)
+def gnomonique(laue_data, name):
+    h = laue_data['h']
+    k =  laue_data['k']
+    l = laue_data['l']
+
+    v = np.array(k) / np.array(l)
+    u = np.array(h) / np.array(l)
+
+    plt.scatter(v, u, color=palette[0], s=15)
+    plt.xlabel(r'$u = h/l$', fontsize=16)
+    plt.ylabel(r'$v = k/l$', fontsize=16)
+    plt.minorticks_on()
+    plt.tick_params(axis="both", which="both", direction="in", top=True, right=True, labelsize=14)
+
+    out_dir = os.path.join("output", "06_gnomonique")
+    os.makedirs(out_dir, exist_ok=True)
+
+    plt.savefig(os.path.join(out_dir, name))
+    plt.close()
+
+def plot_a0(lif_data, nacl_data, si_data):
+    theta_lif = lif_data['theta']
+    theta_nacl = nacl_data['theta']
+    theta_si = si_data['theta']
+    lambda_lif = lif_data['wavelength']
+    lambda_nacl = nacl_data['wavelength']
+    lambda_si = si_data['wavelength']
+    n_lif = lif_data['n']
+    n_nacl = nacl_data['n']
+    n_si = si_data['n']
+
+    x_axis_lif = np.sin(theta_lif)
+    x_axis_nacl = np.sin(theta_nacl)
+    x_axis_si = np.sin(theta_si)
+
+    #y_axis_lif = np.array(lambda_lif) * 1E12
+    #y_axis_nacl = np.array(lambda_nacl) * 1E12
+    #y_axis_si = np.array(lambda_si) * 1E12
+    y_axis_lif = np.array(lambda_lif) * np.array(n_lif) * 1E12
+    y_axis_nacl = np.array(lambda_nacl) * np.array(n_nacl) * 1E12
+    y_axis_si = np.array(lambda_si) * np.array(n_si) * 1E12
+    #y_axis_lif = np.array(theta_lif) * 180 / (np.pi * np.array(n_lif))
+    #y_axis_nacl = np.array(theta_nacl) * 180 / (np.pi * np.array(n_nacl))
+    #y_axis_si = np.array(theta_si) * 180 / (np.pi * np.array(n_si))
+
+    slope_lif, intercept_lif, _, _, _ = linregress(x_axis_lif, y_axis_lif)
+    slope_nacl, intercept_nacl, _, _, _ = linregress(x_axis_nacl, y_axis_nacl)
+    slope_si, intercept_si, _, _, _ = linregress(x_axis_si, y_axis_si)
+
+    plt.scatter(x_axis_lif, y_axis_lif, color=palette[0], marker=".", label="Données LiF")
+    plt.scatter(x_axis_nacl, y_axis_nacl, color=palette[1], marker="s", label="Données NaCl")
+    plt.scatter(x_axis_si, y_axis_si, color=palette[2], marker="p", label="Données Si")
+    plt.plot(x_axis_lif, slope_lif * x_axis_lif + intercept_lif, color=palette[0], linestyle='-', label=f"Régression LiF")
+    plt.plot(x_axis_nacl, slope_nacl * x_axis_nacl + intercept_nacl, color=palette[1], linestyle='--', label=f"Régression NaCl")
+    plt.plot(x_axis_si, slope_si * x_axis_si + intercept_si, color=palette[2], linestyle=':', label=f"Régression Si")
+    plt.legend()
     plt.show()
+    print(slope_lif, slope_nacl, slope_si)
 
 if __name__ == "__main__":
     images_path = glob.glob(os.path.join("data", "recontrasted", "*png"))
@@ -442,4 +546,8 @@ if __name__ == "__main__":
     #draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
     #draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
 
-    #plot_a0(laue_dict_lif, lif_name)
+    gnomonique(laue_dict_lif, lif_name)
+    gnomonique(laue_dict_nacl, nacl_name)
+    gnomonique(laue_dict_si, si_name)
+
+    #plot_a0(laue_dict_lif, laue_dict_nacl, laue_dict_si)
