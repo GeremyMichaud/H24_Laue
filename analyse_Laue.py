@@ -457,7 +457,7 @@ def gnomonique(laue_data, name):
     out_dir = os.path.join("output", "06_gnomonique")
     os.makedirs(out_dir, exist_ok=True)
 
-    plt.savefig(os.path.join(out_dir, name))
+    plt.savefig(os.path.join(out_dir, name), transparent=True)
     plt.close()
 
 def plot_a0(lif_data, nacl_data, si_data):
