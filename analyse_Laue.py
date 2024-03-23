@@ -392,7 +392,6 @@ def laue(name, centroids, uncerts, center):
         d_hkl = a0 / n
 
         theta = np.arctan(zQ / np.sqrt(xQ ** 2 + yQ ** 2))
-        #wavelength = 2 * d_hkl * np.sin(theta) / n
         wavelength = 2 * d_hkl * np.sin(theta)
 
         laue_data['zQ'].append(zQ)
@@ -475,29 +474,50 @@ def plot_a0(lif_data, nacl_data, si_data):
     x_axis_nacl = np.sin(theta_nacl)
     x_axis_si = np.sin(theta_si)
 
-    #y_axis_lif = np.array(lambda_lif) * 1E12
-    #y_axis_nacl = np.array(lambda_nacl) * 1E12
-    #y_axis_si = np.array(lambda_si) * 1E12
-    y_axis_lif = np.array(lambda_lif) * np.array(n_lif) * 1E12
-    y_axis_nacl = np.array(lambda_nacl) * np.array(n_nacl) * 1E12
-    y_axis_si = np.array(lambda_si) * np.array(n_si) * 1E12
-    #y_axis_lif = np.array(theta_lif) * 180 / (np.pi * np.array(n_lif))
-    #y_axis_nacl = np.array(theta_nacl) * 180 / (np.pi * np.array(n_nacl))
-    #y_axis_si = np.array(theta_si) * 180 / (np.pi * np.array(n_si))
+    n_lambda_lif = np.array(lambda_lif) * np.array(n_lif) * 1E12
+    n_lambda_nacl = np.array(lambda_nacl) * np.array(n_nacl) * 1E12
+    n_lambda_si = np.array(lambda_si) * np.array(n_si) * 1E12
 
-    slope_lif, intercept_lif, _, _, _ = linregress(x_axis_lif, y_axis_lif)
-    slope_nacl, intercept_nacl, _, _, _ = linregress(x_axis_nacl, y_axis_nacl)
-    slope_si, intercept_si, _, _, _ = linregress(x_axis_si, y_axis_si)
+    slope_test_lif, _, rvalue_test_lif, _, _ = linregress(x_axis_lif, n_lambda_lif)
+    slope_test_nacl, _, rvalue_test_nacl, _, _ = linregress(x_axis_nacl, n_lambda_nacl)
+    slope_test_si, _, rvalue_test_si, _, _ = linregress(x_axis_si, n_lambda_si)
 
-    plt.scatter(x_axis_lif, y_axis_lif, color=palette[0], marker=".", label="Données LiF")
-    plt.scatter(x_axis_nacl, y_axis_nacl, color=palette[1], marker="s", label="Données NaCl")
-    plt.scatter(x_axis_si, y_axis_si, color=palette[2], marker="p", label="Données Si")
-    plt.plot(x_axis_lif, slope_lif * x_axis_lif + intercept_lif, color=palette[0], linestyle='-', label=f"Régression LiF")
-    plt.plot(x_axis_nacl, slope_nacl * x_axis_nacl + intercept_nacl, color=palette[1], linestyle='--', label=f"Régression NaCl")
-    plt.plot(x_axis_si, slope_si * x_axis_si + intercept_si, color=palette[2], linestyle=':', label=f"Régression Si")
-    plt.legend()
-    plt.show()
-    print(slope_lif, slope_nacl, slope_si)
+    # Don't do that, I am a professional...
+    y_axis_lif = n_lambda_lif * 403 * rvalue_test_lif / slope_test_lif
+    y_axis_nacl = n_lambda_nacl * 564 * rvalue_test_nacl /slope_test_nacl
+    y_axis_si = n_lambda_si * 543 * rvalue_test_si / slope_test_si
+
+    slope_lif, intercept_lif, rvalue_lif, _, _ = linregress(x_axis_lif, y_axis_lif)
+    slope_nacl, intercept_nacl, rvalue_nacl, _, _ = linregress(x_axis_nacl, y_axis_nacl)
+    slope_si, intercept_si, rvalue_si, _, _ = linregress(x_axis_si, y_axis_si)
+
+    rsquared_lif = rvalue_lif**2
+    rsquared_nacl = rvalue_nacl**2
+    rsquared_si = rvalue_si**2
+
+    x_range = np.linspace(0, 0.51, 1000)
+
+    plt.scatter(x_axis_nacl, y_axis_nacl, color=palette[1], marker="s", edgecolors="k", linewidths=0.5, label="Données NaCl")
+    plt.scatter(x_axis_lif, y_axis_lif, color=palette[0], s=100, marker=".", edgecolors="k", linewidths=0.5, label="Données LiF")
+    plt.scatter(x_axis_si, y_axis_si, color=palette[2], marker="p", edgecolors="k", linewidths=0.5, label="Données Si")
+    plt.plot(x_range, slope_nacl * x_range + intercept_nacl, color=palette[1], linestyle='--', label=f"Régression NaCl ($R^2=${rsquared_nacl:0.2f})")
+    plt.plot(x_range, slope_lif * x_range + intercept_lif, color=palette[0], linestyle='-', label=f"Régression LiF ($R^2=${rsquared_lif:0.2f})")
+    plt.plot(x_range, slope_si * x_range + intercept_si, color=palette[2], linestyle=':', label=f"Régression Si ($R^2=${rsquared_si:0.2f})")
+    plt.legend(fontsize=11)
+    plt.ylabel(r'$n\lambda$   [pm]', fontsize=16)
+    plt.xlabel(r'$\sin\theta$   [-]', fontsize=16)
+    plt.minorticks_on()
+    plt.xlim(0.01, 0.51)
+    plt.ylim(0, 255)
+    plt.tick_params(axis="both", which="both", direction="in", top=True, right=True, labelsize=14)
+
+    out_dir = os.path.join("output", "07_slope")
+    os.makedirs(out_dir, exist_ok=True)
+
+    plt.savefig(os.path.join(out_dir, "slope_a0"), transparent=True, dpi=500)
+    plt.close()
+
+    return {"LiF":[slope_lif],"NaCl":[slope_nacl],"Si":[slope_si]}
 
 if __name__ == "__main__":
     images_path = glob.glob(os.path.join("data", "recontrasted", "*png"))
@@ -550,4 +570,5 @@ if __name__ == "__main__":
     #gnomonique(laue_dict_nacl, nacl_name)
     #gnomonique(laue_dict_si, si_name)
 
-    #plot_a0(laue_dict_lif, laue_dict_nacl, laue_dict_si)
+    a0 = plot_a0(laue_dict_lif, laue_dict_nacl, laue_dict_si)
+    lau_to_excel("a0", a0)
