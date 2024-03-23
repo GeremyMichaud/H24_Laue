@@ -336,6 +336,7 @@ def laue(name, centroids, uncerts, center):
         'l': [],
         'n': [],
         'd_hkl': [],
+        'd_hkl_err': [],
         'theta': [],
         'wavelength': []
     }
@@ -382,14 +383,39 @@ def laue(name, centroids, uncerts, center):
         k = round(yQ * factor)
 
         # Adjust l if parity conditions are not met
-        if (h + k) % 2 == 1 or (h + l) % 2 == 1:
-            l = 2
-            factor = l / zQ
-            h = round(xQ * factor)
-            k = round(yQ * factor)
+        if name == "Si":
+            if h % 2 == 0 or k % 2 == 0:
+                l = 2
+                factor = l / zQ
+                h = round(xQ * factor)
+                k = round(yQ * factor)
+                if h % 2 != 0 or k % 2 != 0:
+                    l = 3
+                    factor = l / zQ
+                    h = round(xQ * factor)
+                    k = round(yQ * factor)
+                    if h % 2 == 0 or k % 2 == 0:
+                        l = 4
+                        factor = l / zQ
+                        h = round(xQ * factor)
+                        k = round(yQ * factor)
+                    #if (h + k + l) % 4 != 0:
+                    #    l = 1
+                    #    factor = l / zQ
+                    #    h = round(xQ * factor) + 1
+                    #    k = round(yQ * factor) + 1
+
+        else:
+            if (h + k) % 2 != 0 or (h + l) % 2 != 0:
+                l = 2
+                factor = l / zQ
+                h = round(xQ * factor)
+                k = round(yQ * factor)
 
         n = np.sqrt(h ** 2 + k ** 2 + l ** 2)
         d_hkl = a0 / n
+        d_hkl_uncert = a0 / np.sqrt((xQ_uncert*factor)**2 +
+                                    (yQ_uncert*factor)**2 + (zQ_uncert*factor)**2)
 
         theta = np.arctan(zQ / np.sqrt(xQ ** 2 + yQ ** 2))
         wavelength = 2 * d_hkl * np.sin(theta)
@@ -402,6 +428,7 @@ def laue(name, centroids, uncerts, center):
         laue_data['l'].append(l)
         laue_data['n'].append(round(n))
         laue_data['d_hkl'].append(d_hkl)
+        laue_data['d_hkl_err'].append(d_hkl_uncert)
         laue_data['theta'].append(theta)
         laue_data['wavelength'].append(wavelength)
 
@@ -560,15 +587,15 @@ if __name__ == "__main__":
     laue_dict_si = laue(si_name, centroids_si, uncert_si, center_si)
     #lau_to_excel(lif_name, laue_dict_lif)
     #lau_to_excel(nacl_name, laue_dict_nacl)
-    #lau_to_excel(si_name, laue_dict_si)
+    lau_to_excel(si_name, laue_dict_si)
 
     #draw_points(lif_img, lif_name, centroids_lif, laue_dict_lif, center_lif)
     #draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
-    #draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
+    draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
 
     #gnomonique(laue_dict_lif, lif_name)
     #gnomonique(laue_dict_nacl, nacl_name)
-    #gnomonique(laue_dict_si, si_name)
+    gnomonique(laue_dict_si, si_name)
 
     a0 = plot_a0(laue_dict_lif, laue_dict_nacl, laue_dict_si)
     lau_to_excel("a0", a0)
