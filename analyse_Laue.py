@@ -415,8 +415,11 @@ def laue(name, centroids, uncerts, center):
                         factor = l / zQ
                         h = round(xQ * factor)
                         k = round(yQ * factor)
-                        if (h + k + l) % 4 != 0:
-                            raise ValueError("Couldn't find a valid Miller index combination.")
+            if l == 2 and (h + k + l) % 4 != 0:
+                l = 4
+                factor = l / zQ
+                h = round(xQ * factor)
+                k = round(yQ * factor)
 
         else:
             if (h + k) % 2 != 0 or (h + l) % 2 != 0:
@@ -499,7 +502,7 @@ def gnomonique(laue_data, name):
     out_dir = os.path.join("output", "06_gnomonique")
     os.makedirs(out_dir, exist_ok=True)
 
-    plt.savefig(os.path.join(out_dir, name), transparent=True, bbox_inches="tight", dpi=400)
+    plt.savefig(os.path.join(out_dir, name), transparent=True, bbox_inches="tight")
     plt.close()
 
 def plot_a0(lif_data, nacl_data, si_data):
@@ -557,7 +560,7 @@ def plot_a0(lif_data, nacl_data, si_data):
     out_dir = os.path.join("output", "07_slope")
     os.makedirs(out_dir, exist_ok=True)
 
-    plt.savefig(os.path.join(out_dir, "slope_a0"), transparent=True, dpi=500)
+    plt.savefig(os.path.join(out_dir, "slope_a0"), transparent=True)
     plt.close()
 
     return {"LiF":[slope_lif],"NaCl":[slope_nacl],"Si":[slope_si]}
@@ -609,9 +612,9 @@ if __name__ == "__main__":
     #draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
     #draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
 
-    #gnomonique(laue_dict_lif, lif_name)
-    #gnomonique(laue_dict_nacl, nacl_name)
-    #gnomonique(laue_dict_si, si_name)
+    gnomonique(laue_dict_lif, lif_name)
+    gnomonique(laue_dict_nacl, nacl_name)
+    gnomonique(laue_dict_si, si_name)
 
     a0 = plot_a0(laue_dict_lif, laue_dict_nacl, laue_dict_si)
     #lau_to_excel("a0", a0)
