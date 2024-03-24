@@ -214,9 +214,26 @@ def draw_points(image, name, centroids, laue_dict, center):
 
         cv2.circle(colored_spectrum, (x, y), 10, (255, 255, 255), -1)
 
-        cv2.putText(colored_spectrum, str((h[i],k[i],l[i])), (x-15, y+30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-    
+        text = str((h[i], k[i], l[i]))
+        text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)[0]
+
+        text_x = x - text_size[0] // 2
+        text_y = y + 40
+
+        # Ensure text doesn't go outside the image boundaries
+        if text_x < 0:
+            text_x = 0
+        elif text_x + text_size[0] > image.shape[1]:
+            text_x = image.shape[1] - text_size[0]
+
+        if text_y < 0:
+            text_y = 0
+        elif text_y + text_size[1] > image.shape[0]:
+            text_y = image.shape[0] - text_size[1]
+
+        cv2.putText(colored_spectrum, text, (text_x, text_y),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
+
     out_dir = os.path.join("output", "05_hkl")
     os.makedirs(out_dir, exist_ok=True)
     cv2.imwrite(os.path.join(out_dir, name + ".png"), colored_spectrum)
@@ -336,7 +353,6 @@ def laue(name, centroids, uncerts, center):
         'l': [],
         'n': [],
         'd_hkl': [],
-        'd_hkl_err': [],
         'theta': [],
         'wavelength': []
     }
@@ -399,11 +415,8 @@ def laue(name, centroids, uncerts, center):
                         factor = l / zQ
                         h = round(xQ * factor)
                         k = round(yQ * factor)
-                    #if (h + k + l) % 4 != 0:
-                    #    l = 1
-                    #    factor = l / zQ
-                    #    h = round(xQ * factor) + 1
-                    #    k = round(yQ * factor) + 1
+                        if (h + k + l) % 4 != 0:
+                            raise ValueError("Couldn't find a valid Miller index combination.")
 
         else:
             if (h + k) % 2 != 0 or (h + l) % 2 != 0:
@@ -414,8 +427,6 @@ def laue(name, centroids, uncerts, center):
 
         n = np.sqrt(h ** 2 + k ** 2 + l ** 2)
         d_hkl = a0 / n
-        d_hkl_uncert = a0 / np.sqrt((xQ_uncert*factor)**2 +
-                                    (yQ_uncert*factor)**2 + (zQ_uncert*factor)**2)
 
         theta = np.arctan(zQ / np.sqrt(xQ ** 2 + yQ ** 2))
         wavelength = 2 * d_hkl * np.sin(theta)
@@ -428,7 +439,6 @@ def laue(name, centroids, uncerts, center):
         laue_data['l'].append(l)
         laue_data['n'].append(round(n))
         laue_data['d_hkl'].append(d_hkl)
-        laue_data['d_hkl_err'].append(d_hkl_uncert)
         laue_data['theta'].append(theta)
         laue_data['wavelength'].append(wavelength)
 
@@ -475,15 +485,21 @@ def gnomonique(laue_data, name):
     u = np.array(h) / np.array(l)
 
     plt.scatter(v, u, color=palette[0], s=15)
-    plt.xlabel(r'$u = h/l$   [-]', fontsize=16)
-    plt.ylabel(r'$v = k/l$   [-]', fontsize=16)
+    plt.tick_params(axis="both", which="major", direction="inout", length=7, labelsize=12)
+    plt.tick_params(axis="both", which="minor", direction="inout", length=4)
     plt.minorticks_on()
-    plt.tick_params(axis="both", which="both", direction="in", top=True, right=True, labelsize=14)
+    ax = plt.gca()
+    ax.spines.left.set_position('zero')
+    ax.spines['bottom'].set_position('zero')
+    ax.spines['right'].set_color('none')
+    ax.spines['top'].set_color('none')
+    plt.xlabel(r'$u = h/l$ [-]', fontsize=15, loc='right')
+    plt.ylabel(r'$v = k/l$ [-]', fontsize=15, loc='top')
 
     out_dir = os.path.join("output", "06_gnomonique")
     os.makedirs(out_dir, exist_ok=True)
 
-    plt.savefig(os.path.join(out_dir, name), transparent=True)
+    plt.savefig(os.path.join(out_dir, name), transparent=True, bbox_inches="tight", dpi=400)
     plt.close()
 
 def plot_a0(lif_data, nacl_data, si_data):
@@ -587,15 +603,15 @@ if __name__ == "__main__":
     laue_dict_si = laue(si_name, centroids_si, uncert_si, center_si)
     #lau_to_excel(lif_name, laue_dict_lif)
     #lau_to_excel(nacl_name, laue_dict_nacl)
-    lau_to_excel(si_name, laue_dict_si)
+    #lau_to_excel(si_name, laue_dict_si)
 
-    #draw_points(lif_img, lif_name, centroids_lif, laue_dict_lif, center_lif)
-    #draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
+    draw_points(lif_img, lif_name, centroids_lif, laue_dict_lif, center_lif)
+    draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
     draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
 
     #gnomonique(laue_dict_lif, lif_name)
     #gnomonique(laue_dict_nacl, nacl_name)
-    gnomonique(laue_dict_si, si_name)
+    #gnomonique(laue_dict_si, si_name)
 
     a0 = plot_a0(laue_dict_lif, laue_dict_nacl, laue_dict_si)
-    lau_to_excel("a0", a0)
+    #lau_to_excel("a0", a0)
