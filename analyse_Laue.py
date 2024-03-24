@@ -605,9 +605,9 @@ if __name__ == "__main__":
     #lau_to_excel(nacl_name, laue_dict_nacl)
     #lau_to_excel(si_name, laue_dict_si)
 
-    draw_points(lif_img, lif_name, centroids_lif, laue_dict_lif, center_lif)
-    draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
-    draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
+    #draw_points(lif_img, lif_name, centroids_lif, laue_dict_lif, center_lif)
+    #draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
+    #draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
 
     #gnomonique(laue_dict_lif, lif_name)
     #gnomonique(laue_dict_nacl, nacl_name)
