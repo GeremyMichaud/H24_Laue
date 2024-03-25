@@ -354,7 +354,8 @@ def laue(name, centroids, uncerts, center):
         'n': [],
         'd_hkl': [],
         'theta': [],
-        'wavelength': []
+        'wavelength_exp': [],
+        'wavelength_theo': []
     }
 
     # Calculate center index
@@ -432,7 +433,8 @@ def laue(name, centroids, uncerts, center):
         d_hkl = a0 / n
 
         theta = np.arctan(zQ / np.sqrt(xQ ** 2 + yQ ** 2))
-        wavelength = 2 * d_hkl * np.sin(theta)
+        wavelength_exp = 2 * d_hkl * np.sin(theta)
+        wavelength_theo = 2 * d_hkl * l / n
 
         laue_data['zQ'].append(zQ)
         laue_data['zQ_err'].append(zQ_uncert)
@@ -443,7 +445,8 @@ def laue(name, centroids, uncerts, center):
         laue_data['n'].append(round(n))
         laue_data['d_hkl'].append(d_hkl)
         laue_data['theta'].append(theta)
-        laue_data['wavelength'].append(wavelength)
+        laue_data['wavelength_exp'].append(wavelength_exp)
+        laue_data['wavelength_theo'].append(wavelength_theo)
 
     return laue_data
 
@@ -505,13 +508,20 @@ def gnomonique(laue_data, name):
     plt.savefig(os.path.join(out_dir, name), transparent=True, bbox_inches="tight")
     plt.close()
 
-def plot_a0(lif_data, nacl_data, si_data):
+def plot_a0(lif_data, nacl_data, si_data, exp=True):
     theta_lif = lif_data['theta']
     theta_nacl = nacl_data['theta']
     theta_si = si_data['theta']
-    lambda_lif = lif_data['wavelength']
-    lambda_nacl = nacl_data['wavelength']
-    lambda_si = si_data['wavelength']
+    if exp:
+        name = '_exp'
+        lambda_lif = lif_data['wavelength_exp']
+        lambda_nacl = nacl_data['wavelength_exp']
+        lambda_si = si_data['wavelength_exp']
+    else:
+        name = '_theo'
+        lambda_lif = lif_data['wavelength_theo']
+        lambda_nacl = nacl_data['wavelength_theo']
+        lambda_si = si_data['wavelength_theo']
     n_lif = lif_data['n']
     n_nacl = nacl_data['n']
     n_si = si_data['n']
@@ -560,7 +570,7 @@ def plot_a0(lif_data, nacl_data, si_data):
     out_dir = os.path.join("output", "07_slope")
     os.makedirs(out_dir, exist_ok=True)
 
-    plt.savefig(os.path.join(out_dir, "slope_a0"), transparent=True)
+    plt.savefig(os.path.join(out_dir, "slope_a0" + name), transparent=True)
     plt.close()
 
     return {"LiF":[slope_lif],"NaCl":[slope_nacl],"Si":[slope_si]}
@@ -612,9 +622,11 @@ if __name__ == "__main__":
     #draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
     #draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
 
-    gnomonique(laue_dict_lif, lif_name)
-    gnomonique(laue_dict_nacl, nacl_name)
-    gnomonique(laue_dict_si, si_name)
+    #gnomonique(laue_dict_lif, lif_name)
+    #gnomonique(laue_dict_nacl, nacl_name)
+    #gnomonique(laue_dict_si, si_name)
 
-    a0 = plot_a0(laue_dict_lif, laue_dict_nacl, laue_dict_si)
-    #lau_to_excel("a0", a0)
+    a0_exp = plot_a0(laue_dict_lif, laue_dict_nacl, laue_dict_si, exp=True)
+    a0_theo = plot_a0(laue_dict_lif, laue_dict_nacl, laue_dict_si, exp=False)
+    #lau_to_excel("a0_exp", a0_exp)
+    #lau_to_excel("a0_theo", a0_theo)
