@@ -499,6 +499,8 @@ def gnomonique(laue_data, name):
     ax.spines['bottom'].set_position('zero')
     ax.spines['right'].set_color('none')
     ax.spines['top'].set_color('none')
+    props = dict(boxstyle='round')
+    plt.text(-2, 2.5, name, fontsize=17, bbox=props)
     plt.xlabel(r'$u = h/l$ [-]', fontsize=15, loc='right')
     plt.ylabel(r'$v = k/l$ [-]', fontsize=15, loc='top')
 
@@ -622,9 +624,9 @@ if __name__ == "__main__":
     #draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
     #draw_points(si_img, si_name, centroids_si, laue_dict_si, center_si)
 
-    #gnomonique(laue_dict_lif, lif_name)
-    #gnomonique(laue_dict_nacl, nacl_name)
-    #gnomonique(laue_dict_si, si_name)
+    gnomonique(laue_dict_lif, lif_name)
+    gnomonique(laue_dict_nacl, nacl_name)
+    gnomonique(laue_dict_si, si_name)
 
     a0_exp = plot_a0(laue_dict_lif, laue_dict_nacl, laue_dict_si, exp=True)
     a0_theo = plot_a0(laue_dict_lif, laue_dict_nacl, laue_dict_si, exp=False)
