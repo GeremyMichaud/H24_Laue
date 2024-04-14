@@ -113,12 +113,14 @@ if write:
 df_nacl = pd.read_excel(excel_file_path, sheet_name="NaCl")
 sintheta_nacl = df_nacl["sintheta"]
 sinerr_nacl = df_nacl["sinerr"]
+err_nacl = df_nacl["err"]
 nlambda_nacl = df_nacl["nlambda"]
 slope_nacl, intercept_nacl, rvalue_nacl, stderr_nacl, _ = linregress(sintheta_nacl, nlambda_nacl)
 
 df_lif = pd.read_excel(excel_file_path, sheet_name="LiF")
 sintheta_lif = df_lif["sintheta"]
 sinerr_lif = df_lif["sinerr"]
+err_lif = df_lif["err"]
 nlambda_lif = df_lif["nlambda"]
 slope_lif, intercept_lif, rvalue_lif, stderr_lif, _ = linregress(sintheta_lif, nlambda_lif)
 
@@ -136,7 +138,7 @@ plt.plot(x_range, slope_lif * x_range + intercept_lif, color=palette[0], linesty
 plt.ylabel(r'$n\lambda$   [pm]', fontsize=16)
 plt.xlabel(r'$\sin\theta$   [-]', fontsize=16)
 plt.minorticks_on()
-plt.xlim(0.01, 0.55)
+plt.xlim(0.0001, 0.55)
 plt.ylim(0, 255)
 plt.tick_params(axis="both", which="both", direction="in", top=True, right=True, labelsize=14)
 plt.legend(fontsize=11)
@@ -146,5 +148,7 @@ os.makedirs(out_dir, exist_ok=True)
 
 plt.savefig(os.path.join(out_dir, "bragg_slope_"), transparent=True)
 plt.close()
-print(f"a0 NaCl : {slope_nacl:.2f} ± {stderr_nacl:.2e}")
-print(f"a0 LiF : {slope_lif:.2f} ± {stderr_lif:.2e}")
+nacl_error = stderr_nacl + np.mean(err_nacl)
+lif_error = stderr_lif + np.mean(err_lif)
+print(f"a0 NaCl : {slope_nacl:.2f} ± {nacl_error:.2f}")
+print(f"a0 LiF : {slope_lif:.2f} ± {lif_error:.2f}")
