@@ -132,8 +132,8 @@ plt.errorbar(sintheta_nacl, nlambda_nacl, xerr=sinerr_nacl, fmt='o', markersize=
             elinewidth=0.8, capsize=3, label='Données NaCl')
 plt.errorbar(sintheta_lif, nlambda_lif, xerr=sinerr_lif, fmt='s', markersize=5, color=palette[0],
             elinewidth=0.8, capsize=3, label='Données LiF')
-plt.plot(x_range, slope_nacl * x_range + intercept_nacl, color=palette[1], linestyle='--', alpha=0.4, label=f"Régression NaCl ($R^2=${rsquared_nacl:0.2f})")
-plt.plot(x_range, slope_lif * x_range + intercept_lif, color=palette[0], linestyle='-', alpha=0.4, label=f"Régression LiF ($R^2=${rsquared_lif:0.2f})")
+plt.plot(x_range, slope_nacl * x_range + intercept_nacl, color=palette[1], linestyle='--', alpha=0.4, label=f"Régression NaCl ($R^2=${rsquared_nacl:0.5f})")
+plt.plot(x_range, slope_lif * x_range + intercept_lif, color=palette[0], linestyle='-', alpha=0.4, label=f"Régression LiF ($R^2=${rsquared_lif:0.5f})")
 
 plt.ylabel(r'$n\lambda$   [pm]', fontsize=16)
 plt.xlabel(r'$\sin\theta$   [-]', fontsize=16)
