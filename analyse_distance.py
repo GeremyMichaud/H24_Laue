@@ -146,7 +146,7 @@ def draw_points(image, name, contours):
     os.makedirs(out_dir, exist_ok=True)
     cv2.imwrite(os.path.join(out_dir, name + ".png"), colored_spectrum)
 
-def intensity(image, name, contours):
+def intensity(image, contours):
     image = image.astype(np.uint8)
 
     mean_contour = []
@@ -168,6 +168,37 @@ def intensity(image, name, contours):
         mean_contour.append(mean_intensity / area)
 
     return np.mean(mean_contour), np.std(mean_contour)
+
+def distance2center(image, contours):
+    resolution = 49.5E-6
+    center_x = len(image[0]) // 2
+    center_y = len(image) // 2
+
+    xQs = []
+    yQs = []
+
+    for contour in contours:
+        M = cv2.moments(contour)
+
+        # Calculate the center of the contour
+        cx = int(M['m10'] / M['m00'])
+        cy = int(M['m01'] / M['m00'])
+        
+        xQ = np.abs(cx - center_x) * resolution
+        yQ = np.abs(cy - center_y) * resolution
+
+        xQs.append(xQ)
+        yQs.append(yQ)
+
+    xQ_mean = np.mean(xQs)
+    xQ_err = np.std(xQs)
+    yQ_mean = np.mean(yQs)
+    yQ_err = np.std(xQs)
+
+    distance = np.sqrt(xQ_mean**2 + yQ_mean**2) * 1000
+    distance_err = np.sqrt((xQ_mean / np.sqrt(xQ_mean**2 + yQ_mean**2) * xQ_err)**2 + (yQ_mean / np.sqrt(xQ_mean**2 + yQ_mean**2) * yQ_err)**2) * 1000
+
+    return distance, distance_err
 
 def model_r2(x, fct, intercept):
     return fct / (x ** 2) + intercept
@@ -194,7 +225,7 @@ def plot_intensity(dict_intensity):
 
     plt.legend(fontsize=11)
     plt.ylabel("Intensité relative [-]", fontsize=16)
-    plt.xlabel(f"Distance ($r$) [mm]", fontsize=16)
+    plt.xlabel(f"Distance cristal-écran ($r$) [mm]", fontsize=16)
     plt.minorticks_on()
     plt.xlim(13, 32)
     plt.ylim(0.15, 0.32)
@@ -204,6 +235,40 @@ def plot_intensity(dict_intensity):
     os.makedirs(out_dir, exist_ok=True)
 
     plt.savefig(os.path.join(out_dir, "r2.png"), transparent=True, bbox_inches="tight")
+    plt.close()
+
+def plot_distance(dict_distance):
+    x_values = np.array(list(dict_distance.keys()), dtype=float)
+    x_err = 1.
+    y_values = np.array([value[0] for value in dict_distance.values()])
+    y_err = np.array([value[1] for value in dict_distance.values()])
+
+    #popt, _ = curve_fit(model_r2, x_values, y_values)
+
+    # Calculate R^2 coefficient
+    #residuals = y_values - model_r2(x_values, *popt)
+    #TSS = np.sum((y_values - np.mean(y_values)) ** 2)
+    #RSS = np.sum(residuals ** 2)
+    #R_squared = 1 - (RSS / TSS)
+
+    slope, intercept, r_value, _, _ = linregress(x_values, y_values)
+    x_fit = np.linspace(10, 35, 1000)
+
+    plt.errorbar(x_values, y_values, xerr=x_err, yerr=y_err, color=palette[4], fmt="o", capsize=2, label="Données")
+    plt.plot(x_fit, slope * x_fit + intercept, color=palette[6], linestyle="-", label=f"Régression linéaire ($R^2={r_value**2:.2f}$)")
+
+    plt.legend(fontsize=11)
+    plt.ylabel("Distance point-centre de l'image [mm]", fontsize=16)
+    plt.xlabel(f"Distance cristal-écran [mm]", fontsize=16)
+    plt.minorticks_on()
+    plt.xlim(13, 32)
+    plt.ylim(8, 27)
+    plt.tick_params(axis="both", which="both", direction="in", top=True, right=True, labelsize=14)
+
+    out_dir = os.path.join("output", "11_distance", "05_distance")
+    os.makedirs(out_dir, exist_ok=True)
+
+    plt.savefig(os.path.join(out_dir, "distance.png"), transparent=True, bbox_inches="tight")
     plt.close()
 
 if __name__ == "__main__":
@@ -243,12 +308,20 @@ if __name__ == "__main__":
     #draw_points(img27, name27, contours_27)
     #draw_points(img30, name30, contours_30)
 
-    intensity_15 = intensity(img15, name15, contours_15)
-    intensity_20 = intensity(img20, name20, contours_20)
-    intensity_25 = intensity(img25, name25, contours_25)
-    intensity_27 = intensity(img27, name27, contours_27)
-    intensity_30 = intensity(img30, name30, contours_30)
+    intensity_15 = intensity(img15, contours_15)
+    intensity_20 = intensity(img20, contours_20)
+    intensity_25 = intensity(img25, contours_25)
+    intensity_27 = intensity(img27, contours_27)
+    intensity_30 = intensity(img30, contours_30)
 
     dict_intensity = {15:intensity_15, 20:intensity_20, 25:intensity_25, 27:intensity_27, 30:intensity_30}
-
     #plot_intensity(dict_intensity)
+
+    distance15 = distance2center(img15, contours_15)
+    distance20 = distance2center(img20, contours_20)
+    distance25 = distance2center(img25, contours_25)
+    distance27 = distance2center(img27, contours_27)
+    distance30 = distance2center(img30, contours_30)
+
+    dict_distance = {15:distance15, 20:distance20, 25:distance25, 27:distance27, 30:distance30}
+    #plot_distance(dict_distance)
