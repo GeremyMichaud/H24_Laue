@@ -209,7 +209,7 @@ def plot_intensity(dict_intensity):
     y_values = np.array([value[0] for value in dict_intensity.values()])
     y_err = np.array([value[1] for value in dict_intensity.values()])
 
-    popt, _ = curve_fit(model_r2, x_values, y_values)
+    popt, pcov = curve_fit(model_r2, x_values, y_values)
 
     # Calculate R^2 coefficient
     residuals = y_values - model_r2(x_values, *popt)
@@ -219,9 +219,14 @@ def plot_intensity(dict_intensity):
 
     x_fit = np.linspace(10, 35, 1000)
 
-    plt.errorbar(x_values, y_values, xerr=x_err, yerr=y_err, color=palette[2], fmt="o", capsize=2, label="Données")
+    std_devs = np.sqrt(np.diag(pcov))
+    max_curve = model_r2(x_fit, popt[0] + std_devs[0], popt[1] + std_devs[1])
+    min_curve = model_r2(x_fit, popt[0] - std_devs[0], popt[1] - std_devs[1])
 
-    plt.plot(x_fit, model_r2(x_fit, *popt), color=palette[9], linestyle="-", label=f"Ajustement $\\frac{{1}}{{r^2}}$ ($R^2=${R_squared:0.2f})")
+    plt.errorbar(x_values, y_values, xerr=x_err, yerr=y_err, color=palette[9], fmt="o", capsize=2, label="Données")
+    plt.plot(x_fit, model_r2(x_fit, *popt), color=palette[9], alpha=0.4, linestyle="--", label=f"Ajustement $\\frac{{1}}{{r^2}}$ ($R^2=${R_squared:0.2f})")
+    plt.fill_between(x_fit, max_curve, min_curve, color='gray', alpha=0.2,
+                label="Incertitudes sur l'ajustement")
 
     plt.legend(fontsize=11)
     plt.ylabel("Intensité relative [-]", fontsize=16)
@@ -243,19 +248,11 @@ def plot_distance(dict_distance):
     y_values = np.array([value[0] for value in dict_distance.values()])
     y_err = np.array([value[1] for value in dict_distance.values()])
 
-    #popt, _ = curve_fit(model_r2, x_values, y_values)
-
-    # Calculate R^2 coefficient
-    #residuals = y_values - model_r2(x_values, *popt)
-    #TSS = np.sum((y_values - np.mean(y_values)) ** 2)
-    #RSS = np.sum(residuals ** 2)
-    #R_squared = 1 - (RSS / TSS)
-
     slope, intercept, r_value, _, _ = linregress(x_values, y_values)
     x_fit = np.linspace(10, 35, 1000)
 
-    plt.errorbar(x_values, y_values, xerr=x_err, yerr=y_err, color=palette[4], fmt="o", capsize=2, label="Données")
-    plt.plot(x_fit, slope * x_fit + intercept, color=palette[6], linestyle="-", label=f"Régression linéaire ($R^2={r_value**2:.2f}$)")
+    plt.errorbar(x_values, y_values, xerr=x_err, yerr=y_err, color=palette[6], fmt="o", capsize=2, label="Données")
+    plt.plot(x_fit, slope * x_fit + intercept, color=palette[6], alpha=0.4, linestyle="--", label=f"Régression linéaire ($R^2={r_value**2:.2f}$)")
 
     plt.legend(fontsize=11)
     plt.ylabel("Distance point-centre de l'image [mm]", fontsize=16)

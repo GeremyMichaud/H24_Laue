@@ -332,8 +332,13 @@ def laue(name, centroids, uncerts, center):
             - 'wavelength': List of wavelengths.
     """
     # Define crystal lattice constants
-    crystal_constants = {"LiF": 403E-12, "NaCl": 564E-12, "Si": 543E-12}
-    a0 = crystal_constants.get(name, 0)  # Get lattice constant based on 'name'
+    crystal_constants_theo = {"LiF": 403E-12, "NaCl": 564E-12, "Si": 543E-12}
+    a0_theo = crystal_constants_theo.get(name, 0)
+
+    crystal_constants_exp = {"LiF": 404.1776E-12, "NaCl": 564.6809E-12, "Si": 0}
+    crystal_constants_err = {"LiF": 0.2532E-12, "NaCl": 0.2035E-12, "Si": 0}
+    a0_exp = crystal_constants_exp.get(name, 0)
+    a0_err = crystal_constants_err.get(name, 0)
 
     # Constants for calculations
     resolution = 49.5E-6
@@ -352,10 +357,13 @@ def laue(name, centroids, uncerts, center):
         'k': [],
         'l': [],
         'n': [],
-        'd_hkl': [],
+        'd_hkl_theo': [],
+        'd_hkl_exp': [],
+        'd_hkl_err': [],
         'theta': [],
+        'wavelength_theo': [],
         'wavelength_exp': [],
-        'wavelength_theo': []
+        'wavelength_err': []
     }
 
     # Calculate center index
@@ -430,11 +438,15 @@ def laue(name, centroids, uncerts, center):
                 k = round(yQ * factor)
 
         n = np.sqrt(h ** 2 + k ** 2 + l ** 2)
-        d_hkl = a0 / n
+        d_hkl_theo = a0_theo / n
+        d_hkl_exp = a0_exp / n
+        d_hkl_err = a0_err / n
 
-        theta = np.arctan(zQ / np.sqrt(xQ ** 2 + yQ ** 2))
-        wavelength_exp = 2 * d_hkl * np.sin(theta)
-        wavelength_theo = 2 * d_hkl * l / n
+        theta = np.arctan(l / np.sqrt(h ** 2 + k ** 2))
+
+        wavelength_theo = 2 * d_hkl_theo * np.sin(theta)
+        wavelength_exp = 2 * d_hkl_exp * np.sin(theta)
+        wavelength_err = 2 * np.sin(theta) * d_hkl_err
 
         laue_data['zQ'].append(zQ)
         laue_data['zQ_err'].append(zQ_uncert)
@@ -443,10 +455,13 @@ def laue(name, centroids, uncerts, center):
         laue_data['k'].append(k)
         laue_data['l'].append(l)
         laue_data['n'].append(round(n))
-        laue_data['d_hkl'].append(d_hkl)
+        laue_data['d_hkl_theo'].append(d_hkl_theo)
+        laue_data['d_hkl_exp'].append(d_hkl_exp)
+        laue_data['d_hkl_err'].append(d_hkl_err)
         laue_data['theta'].append(theta)
-        laue_data['wavelength_exp'].append(wavelength_exp)
         laue_data['wavelength_theo'].append(wavelength_theo)
+        laue_data['wavelength_exp'].append(wavelength_exp)
+        laue_data['wavelength_err'].append(wavelength_err)
 
     return laue_data
 
@@ -616,9 +631,9 @@ if __name__ == "__main__":
     laue_dict_lif = laue(lif_name, centroids_lif, uncert_lif, center_lif)
     laue_dict_nacl = laue(nacl_name, centroids_nacl, uncert_nacl, center_nacl)
     laue_dict_si = laue(si_name, centroids_si, uncert_si, center_si)
-    #lau_to_excel(lif_name, laue_dict_lif)
+    #au_to_excel(lif_name, laue_dict_lif)
     #lau_to_excel(nacl_name, laue_dict_nacl)
-    #lau_to_excel(si_name, laue_dict_si)
+    lau_to_excel(si_name, laue_dict_si)
 
     #draw_points(lif_img, lif_name, centroids_lif, laue_dict_lif, center_lif)
     #draw_points(nacl_img, nacl_name, centroids_nacl, laue_dict_nacl, center_nacl)
